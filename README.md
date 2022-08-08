@@ -1,230 +1,200 @@
-<div align="center">
-  <h1>Relayer</h1>
+# In current manual we will learn how to set up IBC relayer between two cosmos chains
 
-![banner](./docs/images/comp.gif)
+Using the example of installing and running Relayer-v2.0.0
 
-[![Project Status: Initial Release](https://img.shields.io/badge/repo%20status-active-green.svg?style=flat-square)](https://www.repostatus.org/#active)
-![GitHub Workflow Status](https://github.com/cosmos/relayer/actions/workflows/build.yml/badge.svg)
-[![GoDoc](https://img.shields.io/badge/godoc-reference-blue?style=flat-square&logo=go)](https://godoc.org/github.com/cosmos/relayer)
-[![Go Report Card](https://goreportcard.com/badge/github.com/cosmos/relayer)](https://goreportcard.com/report/github.com/cosmos/relayer)
-[![License: Apache-2.0](https://img.shields.io/github/license/cosmos/relayer.svg?style=flat-square)](https://github.com/cosmos/relayer/blob/main/LICENSE)
-[![Lines Of Code](https://img.shields.io/tokei/lines/github/cosmos/relayer?style=flat-square)](https://github.com/cosmos/relayer)
-[![Version](https://img.shields.io/github/tag/cosmos/relayer.svg?style=flat-square)](https://github.com/cosmos/relayer/latest)
-</div>
+# Update system
+```
+     sudo apt update && sudo apt upgrade -y
+```
 
-In IBC, blockchains do not directly pass messages to each other over the network. This is where `relayer` comes in. 
-A relayer process monitors for updates on opens paths between sets of [IBC](https://ibcprotocol.org/) enabled chains.
-The relayer submits these updates in the form of specific message types to the counterparty chain. Clients are then used to 
-track and verify the consensus state.
+# Install dependencies
+```
+     sudo apt install wget git make htop unzip -y
+```
+# Install Go 1.18.3
+```
+     cd $HOME && \
+     ver="1.18.3" && \
+     wget "https://golang.org/dl/go$ver.linux-amd64.tar.gz" && \
+     sudo rm -rf /usr/local/go && \
+     sudo tar -C /usr/local -xzf "go$ver.linux-amd64.tar.gz" && \
+     rm "go$ver.linux-amd64.tar.gz" && \
+     echo "export PATH=$PATH:/usr/local/go/bin:$HOME/go/bin" >> $HOME/.bash_profile && \
+     source $HOME/.bash_profile && \
+     go version
+```
+# Make relayer home dir
+```
+     cd $HOME
+     mkdir -p $HOME/.relayer/config
+```
 
-In addition to relaying packets, this relayer can open paths across chains, thus creating clients, connections and channels.
+# Download go-v2 relayer
+```
+     git clone https://github.com/cosmos/relayer.git
+     cd relayer && git checkout v2.0.0
+     make install
+ 
+```
+# Make you own config for Relayer v2
+```
+     cd $HOME
+     mkdir -p $HOME/.relayer/config
+     
+     MEMO=Your memo #archebald#2945
+     
+     KEYSTRIDE=Name of your key #stride
+     KEYGAIA=Name of your key
+     
+     IPSTRIDE=IP your STRIDE node #164.68.125.90
+     PORTSTRIDE=Port RPC your STRIDE node #10002 or 26657 if the nodes are on different servers
 
-Additional information on how IBC works can be found [here](https://ibc.cosmos.network/).
+     IPGAIA=IP you GAIA node #164.68.125.90
+     PORTGAIA=RPC port of your GAIA node #10004 or 26657 if the nodes are on different servers
+```
 
-<div align="center">
+# Next - to add the chain config files manually
+```
+$ rly chains add --url https://gist.githubusercontent.com/Archebald-now/3aef116b9dd67009600d8da1746dfe1f/raw/06f7e8959d5d9735576867ae723ca5c35f485aed/GAIA_config.json gaia
+$ rly chains add --url https://gist.githubusercontent.com/Archebald-now/3aef116b9dd67009600d8da1746dfe1f/raw/06f7e8959d5d9735576867ae723ca5c35f485aed/STRIDE-TESTNET-2_config.json stride
+```
+after which you need to make changes in the configuration file
+```nano /root/.relayer/config/config.yaml```
+and replace rpc-addr with your knowledge
 
-   | Relayer |        IBC-Go        |
-   |:-------:|:--------------------:|
-   | v1.0.0  | ibc-go v1, ibc-go v2 |
-   | v2.0.0  | ibc-go v3            |
+# Or  - copy all one comand to terminal
+```
 
-</div>
-
-
-**If you are updating the relayer from any version prior to `v2.0.0-rc1`, your current config file is not compatible. See: [config_migration](docs/config_migration.md)
-
----
-
-## Table Of Contents
-- [Basic Usage - Relaying Across Chains](#Basic-Usage---Relaying-Packets-Across-Chains)
-- [Create Path Across Chains](./docs/create-path-across-chain.md)
-- [Troubleshooting](./docs/troubleshooting.md)
-- [Features](./docs/features.md)
-- [Relayer Terminology](./docs/terminology.md)
-- [Recommended Pruning Settings](./docs/node_pruning.md)
-- [Demo](./docs/demo.md)
-
----
-## Basic Usage - Relaying Packets Across Chains
-
-> The `-h` (help) flag tailing any `rly` command will be your best friend. USE THIS IN YOUR RELAYING JOURNEY.
-
----
-
-1. **Clone, checkout and install the latest release ([releases page](https://github.com/cosmos/relayer/releases)).**
-
-   *[Go](https://go.dev/doc/install) needs to be installed and a proper Go environment needs to be configured*
-
-    ```shell
-    $ git clone https://github.com/cosmos/relayer.git
-    $ cd relayer && git checkout v2.0.0-rc3
-    $ make install
-    ```
-
-2. **Initialize the relayer's configuration directory/file.**
-   
-   ```shell
-   $ rly config init
-   ```
-   **Default config file location:** `~/.relayer/config/config.yaml`
-
-   By default, transactions will be relayed with a memo of `rly(VERSION)` e.g. `rly(v2.0.0)`.
-
-   To customize the memo for all relaying, use the `--memo` flag when initializing the configuration.
-
-   ```shell
-   $ rly config init --memo "My custom memo"
-   ```
-
-   Custom memos will have `rly(VERSION)` appended. For example, a memo of `My custom memo` running on relayer version `v2.0.0` would result in a transaction memo of `My custom memo | rly(v2.0.0)`. 
-   
-   The `--memo` flag is also available for other `rly` commands also that involve sending transactions such as `rly tx link` and `rly start`. It can be passed there to override the `config.yaml` value if desired.
-
-   To omit the memo entirely, including the default value of `rly(VERSION)`, use `-` for the memo.
-
-3. **Configure the chains you want to relay between.**
-   
-   In our example, we will configure the relayer to operate on the canonical path between the Cosmos Hub and Osmosis.  
-   <br>
-   The `rly chains add` command fetches chain meta-data from the [chain-registry](https://github.com/cosmos/chain-registry) and adds it to your config file.
-   
-   ```shell
-   $ rly chains add cosmoshub osmosis
-   ```
-       
-   Adding chains from the chain-registry randomly selects an RPC address from the registry entry.  
-   If you are running your own node, manually go into the config and adjust the `rpc-addr` setting.  
-
-   > NOTE: `rly chains add` will check the liveliness of the available RPC endpoints for that chain in the chain-registry.   
-   > It is possible that the command will fail if none of these RPC endpoints are available. In this case, you will want to manually add the chain config.
-
-   To add the chain config files manually, example config files have been included [here](https://github.com/cosmos/relayer/tree/main/docs/example-configs/)
-   ```shell
-   $ rly chains add --url https://raw.githubusercontent.com/cosmos/relayer/main/docs/example-configs/cosmoshub-4.json cosmoshub
-   $ rly chains add --url https://raw.githubusercontent.com/cosmos/relayer/main/docs/example-configs/osmosis-1.json osmosis
-   ```
-   
-4. **Import OR create new keys for the relayer to use when signing and relaying transactions.**
-
-   >`key-name` is an identifier of your choosing.    
-
-   If you need to generate a new private key you can use the `add` subcommand.
-
-    ```shell
-    $ rly keys add cosmoshub [key-name]  
-    $ rly keys add osmosis [key-name]  
-    ```
+sudo tee $HOME/.relayer/config/config.yaml > /dev/null <<EOF
+global:
+    api-listen-addr: :5183
+    timeout: 10s
+    memo: $MEMO
+    light-cache-size: 20
+chains:
+    GAIA:
+        type: cosmos
+        value:
+            key: $KEYGAIA
+            chain-id: GAIA
+            rpc-addr: http://$IPGAIA:$PORTGAIA
+            account-prefix: cosmos
+            keyring-backend: test
+            gas-adjustment: 1.3
+            gas-prices: 0.01uatom
+            debug: false
+            timeout: 10s
+            output-format: json
+            sign-mode: sync
+            strategy:
+            type: native
+            version: ics20-1
+            order: UNORDERED
+    stride:
+        type: cosmos
+        value:
+            key: $KEYSTRIDE
+            chain-id: STRIDE-TESTNET-2
+            rpc-addr: http://$IPSTRIDE:$PORTSTRIDE
+            account-prefix: stride
+            keyring-backend: test
+            gas-adjustment: 1.3
+            gas-prices: 0.01ustrd
+            debug: false
+            timeout: 20s
+            output-format: json
+            sign-mode: sync
+            strategy:
+            type: native
+            version: ics20-1
+            order: UNORDERED
+paths:
+    gaia-stride:
+        src:
+            chain-id: STRIDE-TESTNET-2
+            client-id: 07-tendermint-0
+            connection-id: connection-0
+            port-id: icacontroller-GAIA.DELEGATION,transfer,icacontriiler-GAIA.FEE,icacontroller-GAIA.WITHDRAWAL,icacontroller-GAIA.REDEMPTION
   
-   If you already have a private key and want to restore it from your mnemonic you can use the `restore` subcommand.
+        dst:
+            chain-id: GAIA
+            client-id: 07-tendermint-0
+            connection-id: connection-0
+            port-id: icahost,icacontroller-GAIA.DELEGATION,transfer,icacontriiler-GAIA.FEE,icacontroller-GAIA.WITHDRAWAL,icacontroller-GAIA.REDEMPTION
+        src-channel-filter:
+            rule: allowlist
+            channel-list:
+                - channel-0 
+                - channel-1 
+                - channel-2 
+                - channel-3 
+                - channel-4 
+        dst-channel-filter:
+            rule: allowlist
+            channel-list:
+                - channel-0 
+                - channel-1 
+                - channel-2 
+                - channel-3 
+                - channel-4
+EOF
+```
 
-   ```shell
-   $ rly keys restore cosmoshub [key-name] "mnemonic words here"
-   $ rly keys restore osmosis [key-name] "mnemonic words here"
+# Check chains added to relayer
    ```
-
-5. **Edit the relayer's `key` values in the config file to match the `key-name`'s chosen above.**
-
-   >This step is necessary if you chose a `key-name` other than "default"
-   
-   Example:
-      ```yaml
-      - type: cosmos
-         value:
-         key: YOUR-KEY-NAME-HERE
-         chain-id: cosmoshub-4
-         rpc-addr: http://localhost:26657
-      ```
-
-6. **Ensure the keys associated with the configured chains are funded.**
-
-   >Your configured addresses will need to contain some of the respective native tokens for paying relayer fees.  
-   
-   <br>
-   You can query the balance of each configured key by running:  
-
-   ```shell
-   $ rly q balance cosmoshub
-   $ rly q balance osmosis
+   rly chains list
    ```
-
-7. **Configure path meta-data in config file.**
-   <br>
-   We have the chain meta-data configured, now we need path meta-data. For more info on `path` terminology visit [here](docs/troubleshooting.md).  
-   >NOTE: Thinking of chains in the config as "source" and "destination" can be confusing. Be aware that most path are bi-directional.
-
-   <br>
-   `rly paths fetch` will check for the relevant `path.json` files for ALL configured chains in your config file.  
-   The path meta-data is queried from the [interchain](https://github.com/cosmos/relayer/tree/main/interchain) directory.
-
-     ```shell
-     $ rly paths fetch
-     ```
-   > **NOTE:** Don't see the path metadata for paths you want to relay on?   
-   > Please open a PR to add this metadata to the GitHub repo!
-
-   At minimum, this command will add two paths, in our case it will add one path from cosmoshub to osmosis and another path from osmosis to cosmoshub.
-
-
-8. #### **Configure the channel filter.**
-   
-   By default, the relayer will relay packets over all channels on a given connection.  
-   <br>
-   Each path has a `src-channel-filter` which you can utilize to specify which channels you would like to relay on.   
-   <br>
-   The `rule` can be one of three values:  
-   - `allowlist` which tells the relayer to relay on _ONLY_ the channels in `channel-list`
-   - `denylist` which tells the relayer to relay on all channels _BESIDES_ the channels in `channel-list`
-   - empty value, which is the default setting, and tells the relayer to relay on all channels    
-   <br>
-   
-   Since we are only worried about the canonical channel between the Cosmos Hub and Osmosis our filter settings would look like the following.  
-   <br>
-   Example:
-   ```yaml
-   hubosmo:
-      src:
-          chain-id: cosmoshub-4
-          client-id: 07-tendermint-259
-          connection-id: connection-257
-      dst:
-          chain-id: osmosis-1
-          client-id: 07-tendermint-1
-          connection-id: connection-1
-      src-channel-filter:
-              rule: allowlist
-              channel-list: [channel-141]  
+# Successful output:
+```
+ 1: STRIDE-TESTNET-2     -> type(cosmos) key(✔) bal(✔) path(✔)
+ 2: GAIA                 -> type(cosmos) key(✔) bal(✔) path(✔)
+```
+# Check path is correct
    ```
+   rly paths list
+   ```
+# Successful output:
+```
+0: gaia-stride          -> chns(✔) clnts(✔) conn(✔) (GAIA<>STRIDE-TESTNET-2)
+```
+
+# Import  keys for the relayer to use when signing and relaying transactions
+   ```
+     rly keys restore stride $KEYSTRIDE "mnemonic words here"
+     rly keys restore gaia $KEYGAIA "mnemonic words here"
+   ```
+# Check wallet balance
+```
+rly q balance stride
+rly q balance gaia
+```
    
-   >Because two channels between chains are tightly coupled, there is no need to specify the dst channels.
-   >If you only know the "dst" channel-ID you can query the "src" channel-ID by running: `rly q channel <dst_chain_name> <dst_channel_id> <port> | jq '.channel.counterparty.channel_id'`
+# Create go-v2 relayer service file
+ (copy and paste into the terminal with one command)
+```
+sudo tee /etc/systemd/system/rlyd.service > /dev/null <<EOF
+[Unit]
+Description=Relayer_v2
+After=network.target
+[Service]
+Type=simple
+User=$USER
+ExecStart=$(which rly) start gaia-stride --log-format logfmt --processor events
+Restart=on-failure
+RestartSec=3
+LimitNOFILE=4096
+[Install]
+WantedBy=multi-user.target
+EOF
+```
 
-10. **Finally, we start the relayer on the desired path.**
+# Start service
+```
+     sudo systemctl daemon-reload
+     sudo systemctl enable rlyd
+     sudo systemctl restart rlyd && journalctl -fu rlyd -o cat
+```
+# The following logs will indicate the successful completion of setting up Relayer_v2.0.0:
+<a href='https://postimg.cc/XBGzBqFv' target='_blank'><img src='https://i.postimg.cc/XBGzBqFv/logs-relayer-v2.jpg' border='0' alt='logs-relayer-v2'/></a>
 
-     The relayer will periodically update the clients and listen for IBC messages to relay.
-
-     ```shell
-     $ rly paths list
-     $ rly start [path]
-     ```
-   
-    You will need to start a separate shell instance for each path you wish to relay over.
-
-    >When running multiple instances of `rly start`, you will need to use the `--debug-addr` flag and provide an address:port. You can also pass an empty string `''`  to turn off this feature or pass `localhost:0` to randomly select a port.
-
-    ---
-    [[TROUBLESHOOTING](docs/troubleshooting.md)]
----
-
-## Security Notice
-
-If you would like to report a security critical bug related to the relayer repo,
-please reach out @jackzampolin or @Ethereal0ne on telegram.
-
-## Code of Conduct
-
-The Cosmos community is dedicated to providing an inclusive and harassment free
-experience for contributors. Please visit [Code of Conduct](CODE_OF_CONDUCT.md) for more information.
-
----
-
-[Create Path Across Chains -->](docs/create-path-across-chain.md)
+# Thanks to goooodnes#8929 and Zuka#5870 for the inspiration for this guide.
